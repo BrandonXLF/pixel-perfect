@@ -34,8 +34,7 @@ void ShowPixels(HWND hWnd) {
         0, 0,
         rcClient.right, rcClient.bottom,
         hdcScreen,
-        cursorPos.x - (PIXEL_COUNT / 2),
-        cursorPos.y - (PIXEL_COUNT / 2),
+        cursorPos.x - (PIXEL_COUNT / 2), cursorPos.y - (PIXEL_COUNT / 2),
         PIXEL_COUNT, PIXEL_COUNT,
         SRCCOPY
     )) {
@@ -47,16 +46,18 @@ void ShowPixels(HWND hWnd) {
     int width = rcClient.right - rcClient.left;
     int height = rcClient.bottom - rcClient.top;
 
+    // Vertical lines
     for (int i = 1; i < PIXEL_COUNT; i++) {
         int frac = (width * i) / PIXEL_COUNT;
-        RECT myRect = { frac, 0, frac + 1, height };
-        FillRect(hdcWindow, &myRect, hBr);
+        RECT lineRect = { frac, 0, frac + 1, height };
+        FillRect(hdcWindow, &lineRect, hBr);
     }
 
+    // Horizontal lines
     for (int i = 1; i < PIXEL_COUNT; i++) {
         int frac = (height * i) / PIXEL_COUNT;
-        RECT myRect = { 0, frac, width, frac + 1 };
-        FillRect(hdcWindow, &myRect, hBr);
+        RECT lineRect = { 0, frac, width, frac + 1 };
+        FillRect(hdcWindow, &lineRect, hBr);
     }
 
     DeleteObject(hBr);
@@ -152,8 +153,8 @@ void RegisterWindowClass(HINSTANCE hInstance) {
 int APIENTRY wWinMain(
     _In_ HINSTANCE hInstance,
     _In_opt_ HINSTANCE hPrevInstance,
-    _In_ LPWSTR    lpCmdLine,
-    _In_ int       nCmdShow
+    _In_ LPWSTR lpCmdLine,
+    _In_ int nCmdShow
 ) {
     RegisterWindowClass(hInstance);
 
