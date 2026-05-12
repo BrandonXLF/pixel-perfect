@@ -1,4 +1,5 @@
 #include "windows.h"
+#include "shellscalingapi.h"
 
 constexpr UINT UPDATE_TIMER = 1001;
 constexpr UINT MOVE_TIMER = 1002;
@@ -72,14 +73,21 @@ void MoveToCursor(HWND hWnd) {
         exit(1);
     }
 
-    RECT viewingRect = {
-        cursorPos.x - WINDOW_SIZE - CURSOR_GAP,
-        cursorPos.y - WINDOW_SIZE - CURSOR_GAP,
-        cursorPos.x - CURSOR_GAP,
-        cursorPos.y - CURSOR_GAP,
-    };
+    RECT findRect = { cursorPos.x, cursorPos.y, cursorPos.x, cursorPos.y };
+    HMONITOR hMonitor = MonitorFromRect(&findRect, MONITOR_DEFAULTTONEAREST);
 
-    HMONITOR hMonitor = MonitorFromRect(&viewingRect, MONITOR_DEFAULTTONEAREST);
+    UINT dpiX, dpiY;
+    GetDpiForMonitor(hMonitor, MDT_EFFECTIVE_DPI, &dpiX, &dpiY);
+
+    float scaleX = dpiX / 96.0f;
+    float scaleY = dpiY / 96.0f;
+
+    RECT viewingRect = {
+        cursorPos.x - (WINDOW_SIZE + CURSOR_GAP) * scaleX,
+        cursorPos.y - (WINDOW_SIZE + CURSOR_GAP) * scaleY,
+        cursorPos.x - CURSOR_GAP * scaleX,
+        cursorPos.y - CURSOR_GAP * scaleY,
+    };
 
     MONITORINFO monitorInfo;
     monitorInfo.cbSize = sizeof(MONITORINFO);
@@ -92,24 +100,26 @@ void MoveToCursor(HWND hWnd) {
         monitorRect.right >= viewingRect.right &&
         monitorRect.top <= viewingRect.top &&
         monitorRect.bottom >= viewingRect.bottom
-    ) {
-        windowOffset = -WINDOW_SIZE - CURSOR_GAP;
-    } else {
-        windowOffset = CURSOR_GAP;
+        ) {
+        windowOffset = (-WINDOW_SIZE - CURSOR_GAP) * scaleX;
+    }
+    else {
+        windowOffset = CURSOR_GAP * scaleX;
     }
 
     MoveWindow(
         hWnd,
         cursorPos.x + windowOffset, cursorPos.y + windowOffset,
-        WINDOW_SIZE, WINDOW_SIZE,
+        WINDOW_SIZE * scaleX, WINDOW_SIZE * scaleY,
         FALSE
     );
+
+    ShowPixels(hWnd);
 }
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
         case WM_TIMER: {
-            ShowPixels(hWnd);
             MoveToCursor(hWnd);
             break;
         }
@@ -156,6 +166,8 @@ int APIENTRY wWinMain(
     _In_ LPWSTR lpCmdLine,
     _In_ int nCmdShow
 ) {
+    SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE);
+
     RegisterWindowClass(hInstance);
 
     HWND hWnd = CreateWindowEx(
@@ -173,7 +185,6 @@ int APIENTRY wWinMain(
         return 1;
     }
 
-    ShowPixels(hWnd);
     MoveToCursor(hWnd);
     ShowWindow(hWnd, SW_NORMAL);
 
