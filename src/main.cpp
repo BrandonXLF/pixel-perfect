@@ -1,16 +1,15 @@
 #include "windows.h"
+#include "consts.h"
 #include "shellscalingapi.h"
+#include "action.h"
+#include "math.h"
 
-constexpr UINT UPDATE_TIMER = 1001;
-constexpr UINT MOVE_TIMER = 1002;
-
-constexpr int PIXEL_COUNT = 16;
-constexpr int WINDOW_SIZE = PIXEL_COUNT * 12;
-constexpr int CURSOR_GAP = 12;
 constexpr int UPDATE_INTERVAL = 100;
-
-constexpr WCHAR WINDOW_TITLE[] = L"Pixel Perfect";
 constexpr WCHAR CLASS_NAME[] = L"PixelPerfectWindow";
+
+DWORD PIXEL_COUNT = PIXEL_COUNT_DEFAULT;
+DWORD PIXEL_SIZE = PIXEL_SIZE_DEFAULT;
+BOOL ESC_TO_EXIT = ESC_TO_EXIT_DEFAULT;
 
 void ShowPixels(HWND hWnd) {
     HDC hdcScreen = GetDC(NULL);
@@ -67,6 +66,9 @@ void ShowPixels(HWND hWnd) {
 }
 
 void MoveToCursor(HWND hWnd) {
+    int windowSize = PIXEL_COUNT * PIXEL_SIZE;
+    int cursorGap = ceil((float) PIXEL_COUNT / 2) + 4;
+
     POINT cursorPos;
     if (!GetCursorPos(&cursorPos)) {
         MessageBox(hWnd, L"Failed to get cursor position", L"Error", MB_OK);
@@ -83,10 +85,10 @@ void MoveToCursor(HWND hWnd) {
     float scaleY = dpiY / 96.0f;
 
     RECT viewingRect = {
-        cursorPos.x - (WINDOW_SIZE + CURSOR_GAP) * scaleX,
-        cursorPos.y - (WINDOW_SIZE + CURSOR_GAP) * scaleY,
-        cursorPos.x - CURSOR_GAP * scaleX,
-        cursorPos.y - CURSOR_GAP * scaleY,
+        cursorPos.x - (windowSize + cursorGap) * scaleX,
+        cursorPos.y - (windowSize + cursorGap) * scaleY,
+        cursorPos.x - cursorGap * scaleX,
+        cursorPos.y - cursorGap * scaleY,
     };
 
     MONITORINFO monitorInfo;
@@ -101,16 +103,16 @@ void MoveToCursor(HWND hWnd) {
         monitorRect.top <= viewingRect.top &&
         monitorRect.bottom >= viewingRect.bottom
         ) {
-        windowOffset = (-WINDOW_SIZE - CURSOR_GAP) * scaleX;
+        windowOffset = (-windowSize - cursorGap) * scaleX;
     }
     else {
-        windowOffset = CURSOR_GAP * scaleX;
+        windowOffset = cursorGap * scaleX;
     }
 
     MoveWindow(
         hWnd,
         cursorPos.x + windowOffset, cursorPos.y + windowOffset,
-        WINDOW_SIZE * scaleX, WINDOW_SIZE * scaleY,
+        windowSize * scaleX, windowSize * scaleY,
         FALSE
     );
 
@@ -125,14 +127,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         }
         case WM_PAINT: {
             PAINTSTRUCT ps;
-
             BeginPaint(hWnd, &ps);
             ShowPixels(hWnd);
             EndPaint(hWnd, &ps);
-
             break;
         }
         case WM_HOTKEY:
+			if (ESC_TO_EXIT) PostQuitMessage(0);
+            break;
         case WM_DESTROY:
             PostQuitMessage(0);
             break;
@@ -160,30 +162,43 @@ void RegisterWindowClass(HINSTANCE hInstance) {
     RegisterClass(&wc);
 }
 
+void LoadData() {
+    DWORD size = sizeof(PIXEL_COUNT);
+	RegGetValue(HKEY_CURRENT_USER, REG_KEY, L"PixelCount", RRF_RT_DWORD, NULL, &PIXEL_COUNT, &size);
+
+    size = sizeof(PIXEL_SIZE);
+    RegGetValue(HKEY_CURRENT_USER, REG_KEY, L"PixelSize", RRF_RT_DWORD, NULL, &PIXEL_SIZE, &size);
+
+    size = sizeof(ESC_TO_EXIT);
+    RegGetValue(HKEY_CURRENT_USER, REG_KEY, L"EscToExit", RRF_RT_DWORD, NULL, &ESC_TO_EXIT, &size);
+}
+
 int APIENTRY wWinMain(
     _In_ HINSTANCE hInstance,
     _In_opt_ HINSTANCE hPrevInstance,
     _In_ LPWSTR lpCmdLine,
     _In_ int nCmdShow
 ) {
-    SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE);
+    LoadData();
+
+    ActionThreadData* actData = new ActionThreadData();
+    actData->hInstance = hInstance;
+    actData->pThreadId = GetCurrentThreadId();
+    HANDLE actHandle = CreateThread(NULL, 0, StartActionThread, actData, 0, NULL);
 
     RegisterWindowClass(hInstance);
-
     HWND hWnd = CreateWindowEx(
-        WS_EX_TOPMOST,
+        WS_EX_TOPMOST | WS_EX_TOOLWINDOW,
         CLASS_NAME,
         WINDOW_TITLE,
         WS_POPUPWINDOW,
         CW_USEDEFAULT, NULL,
-        WINDOW_SIZE, WINDOW_SIZE,
+        PIXEL_COUNT * PIXEL_SIZE, PIXEL_COUNT * PIXEL_SIZE,
         NULL, NULL,
         hInstance, NULL
     );
 
-    if (!hWnd) {
-        return 1;
-    }
+    if (!hWnd) return 1;
 
     MoveToCursor(hWnd);
     ShowWindow(hWnd, SW_NORMAL);
@@ -199,5 +214,5 @@ int APIENTRY wWinMain(
 
     KillTimer(hWnd, NULL);
 
-    return (int)msg.wParam;
+    return 0;
 }
