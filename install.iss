@@ -22,7 +22,7 @@ Name: desktop; Description: Create a desktop icon; Types: standard
 Name: start; Description: Add to start menu; Types: standard
 
 [Files]
-Source: "x64\Release\pixel-perfect.exe"; DestDir: "{app}"; DestName: pixel-perfect.exe
+Source: "x64\Release\pixel-perfect.exe"; DestDir: "{app}"; DestName: pixel-perfect.exe; Flags: ignoreversion
 
 [Icons]
 Name: "{commondesktop}\Pixel Perfect"; Filename: "{app}\pixel-perfect.exe"; Components: desktop; Check: IsAdminLoggedOn
@@ -31,4 +31,3 @@ Name: "{group}\Pixel Perfect"; Filename: "{app}\pixel-perfect.exe"; Components: 
 
 [Run]
 Filename: "{app}\pixel-perfect.exe"; Description: "Launch Pixel Perfect"; Flags: postinstall
-
