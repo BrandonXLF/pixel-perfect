@@ -2,13 +2,18 @@
 #include "consts.h"
 #include "action.h"
 
+constexpr int WINDOW_WIDTH = 426;
+constexpr int WINDOW_HEIGHT = 54;
+constexpr WCHAR ACTION_CLASS_NAME[] = L"PixelPerfectActionWindow";
+
 constexpr UINT SIZE_INPUT = 10;
 constexpr UINT ZOOM_INPUT = 20;
 constexpr UINT ESC_CHECKBOX = 30;
 constexpr UINT RESET_BUTTON = 40;
-constexpr WCHAR ACTION_CLASS_NAME[] = L"PixelPerfectActionWindow";
 
 bool noChange = false;
+HFONT hFont;
+HFONT hFontLarge;
 
 void ResetAllValues(HWND hWnd) {
 	noChange = true;
@@ -105,30 +110,26 @@ void RegisterActionWndClass(HINSTANCE hInstance) {
     RegisterClass(&wc);
 }
 
+void CreateWidget(
+    LPCWSTR className, int style, LPCWSTR text,
+    int x, int y, int width, int height, int action,
+    HWND hWnd, HINSTANCE hInstance, bool large = false
+) {
+    HWND hCtrl = CreateWindow(
+        className, text,
+        WS_CHILD | WS_VISIBLE | style,
+        x, y, width, height,
+        hWnd, (HMENU)action, hInstance, NULL
+    );
+
+    SendMessage(hCtrl, WM_SETFONT, (WPARAM)(large ? hFontLarge : hFont), TRUE);
+}
+
 void CreateNumberInput(LPCWSTR label, int x, int labelWidth, int action, HWND hWnd, HINSTANCE hInstance) {
-    CreateWindow(
-        L"STATIC", label,
-        WS_CHILD | WS_VISIBLE,
-        x, 10, labelWidth, 20, hWnd, (HMENU)0, hInstance, NULL
-    );
-
-    CreateWindow(
-        L"EDIT", L"",
-        WS_CHILD | WS_VISIBLE | WS_BORDER | ES_NUMBER,
-        x + labelWidth + 5, 8, 30, 20, hWnd, (HMENU)action, hInstance, NULL
-    );
-
-    CreateWindow(
-        L"BUTTON", L"-",
-        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-        x + labelWidth + 40, 5, 25, 25, hWnd, (HMENU)(action + 1), hInstance, NULL
-    );
-
-    CreateWindow(
-        L"BUTTON", L"+",
-        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-        x + labelWidth + 70, 5, 25, 25, hWnd, (HMENU)(action + 2), hInstance, NULL
-    );
+    CreateWidget(L"STATIC", 0, label, x, 10, labelWidth, 20, 0, hWnd, hInstance);
+    CreateWidget(L"EDIT", WS_BORDER | ES_NUMBER, L"", x + labelWidth + 5, 8, 30, 20, action, hWnd, hInstance);
+    CreateWidget(L"BUTTON", BS_PUSHBUTTON, L"\u2212", x + labelWidth + 40, 5, 26, 25, action + 1, hWnd, hInstance, true);
+    CreateWidget(L"BUTTON", BS_PUSHBUTTON, L"+", x + labelWidth + 70, 5, 26, 25, action + 2, hWnd, hInstance, true);
 }
 
 void ShowActionWindow(HINSTANCE hInstance) {
@@ -141,7 +142,7 @@ void ShowActionWindow(HINSTANCE hInstance) {
     RECT findRect = { cursorPos.x, cursorPos.y, cursorPos.x, cursorPos.y };
     HMONITOR hMonitor = MonitorFromRect(&findRect, MONITOR_DEFAULTTONEAREST);
 
-    MONITORINFO monitorInfo;
+    MONITORINFO monitorInfo{};
     monitorInfo.cbSize = sizeof(MONITORINFO);
     GetMonitorInfo(hMonitor, &monitorInfo);
     RECT monitorRect = monitorInfo.rcMonitor;
@@ -151,34 +152,35 @@ void ShowActionWindow(HINSTANCE hInstance) {
         ACTION_CLASS_NAME,
         WINDOW_TITLE,
         WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
-        monitorRect.left + (monitorRect.right - monitorRect.left - 440) / 2, monitorRect.top,
-        440, 55 + GetSystemMetrics(SM_CYSMCAPTION),
+        monitorRect.left + (monitorRect.right - monitorRect.left - WINDOW_WIDTH) / 2, monitorRect.top,
+        WINDOW_WIDTH, WINDOW_HEIGHT + GetSystemMetrics(SM_CYSMCAPTION),
         NULL, NULL,
         hInstance, NULL
     );
 
-    CreateNumberInput(L"Size:", 10, 35, SIZE_INPUT, hWnd, hInstance);
-    CreateNumberInput(L"Zoom:", 152, 40, ZOOM_INPUT, hWnd, hInstance);
-
-    CreateWindow(
-        L"BUTTON", L"Esc",
-        WS_CHILD | WS_VISIBLE | BS_CHECKBOX | BS_AUTOCHECKBOX,
-        302, 5, 45, 25, hWnd, (HMENU)ESC_CHECKBOX, hInstance, NULL
-    );
-
-    CreateWindow(
-        L"BUTTON", L"Reset",
-        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-        355, 5, 60, 25, hWnd, (HMENU)RESET_BUTTON, hInstance, NULL
-    );
+    CreateNumberInput(L"Size:", 10, 30, SIZE_INPUT, hWnd, hInstance);
+    CreateNumberInput(L"Zoom:", 148, 38, ZOOM_INPUT, hWnd, hInstance);
+    CreateWidget(L"BUTTON", BS_CHECKBOX | BS_AUTOCHECKBOX, L"Esc", 295, 5, 45, 25, ESC_CHECKBOX, hWnd, hInstance);
+    CreateWidget(L"BUTTON", BS_PUSHBUTTON, L"Reset", 344, 5, 56, 25, RESET_BUTTON, hWnd, hInstance);
 
 	ResetAllValues(hWnd);
 }
 
 DWORD WINAPI StartActionThread(LPVOID lpParam) {
     ActionThreadData* params = (ActionThreadData*)lpParam;
-
     SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_UNAWARE_GDISCALED);
+
+    hFont = CreateFont(
+        18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+        DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, VARIABLE_PITCH,
+        L"MS Shell Dlg"
+    );
+
+    hFontLarge = CreateFont(
+        21, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+        DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, VARIABLE_PITCH,
+        L"MS Shell Dlg"
+    );
 
     RegisterActionWndClass(params->hInstance);
     ShowActionWindow(params->hInstance);
@@ -189,6 +191,9 @@ DWORD WINAPI StartActionThread(LPVOID lpParam) {
         DispatchMessage(&msg);
     }
 
+    DeleteObject(hFont);
+    DeleteObject(hFontLarge);
     PostThreadMessage(params->pThreadId, WM_QUIT, 0, 0);
+
     return 0;
 }

@@ -1,6 +1,6 @@
 [Setup]
 AppName = Pixel Perfect
-AppVersion = 1.0.0
+AppVersion = 0.0.0
 DefaultDirName = {autopf}\PixelPerfect
 OutputBaseFilename = Pixel Perfect Installer
 PrivilegesRequired = lowest

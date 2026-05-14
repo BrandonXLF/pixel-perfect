@@ -91,7 +91,7 @@ void MoveToCursor(HWND hWnd) {
         cursorPos.y - cursorGap * scaleY,
     };
 
-    MONITORINFO monitorInfo;
+    MONITORINFO monitorInfo{};
     monitorInfo.cbSize = sizeof(MONITORINFO);
     GetMonitorInfo(hMonitor, &monitorInfo);
     RECT monitorRect = monitorInfo.rcMonitor;
@@ -174,10 +174,8 @@ void LoadData() {
 }
 
 int APIENTRY wWinMain(
-    _In_ HINSTANCE hInstance,
-    _In_opt_ HINSTANCE hPrevInstance,
-    _In_ LPWSTR lpCmdLine,
-    _In_ int nCmdShow
+    _In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
+    _In_ LPWSTR lpCmdLine, _In_ int nCmdShow
 ) {
     LoadData();
 
