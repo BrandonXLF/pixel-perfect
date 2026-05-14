@@ -1,8 +1,8 @@
 #pragma once
-#include "windows.h"
 
 struct ActionThreadData {
     HINSTANCE hInstance;
+	HWND pHWnd;
     int pThreadId;
 };
 

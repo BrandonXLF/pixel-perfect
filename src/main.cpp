@@ -1,15 +1,12 @@
 #include "windows.h"
-#include "consts.h"
 #include "shellscalingapi.h"
-#include "action.h"
 #include "math.h"
+#include "consts.h"
+#include "config.h"
+#include "action.h"
 
 constexpr int UPDATE_INTERVAL = 100;
 constexpr WCHAR CLASS_NAME[] = L"PixelPerfectWindow";
-
-DWORD PIXEL_COUNT = PIXEL_COUNT_DEFAULT;
-DWORD PIXEL_SIZE = PIXEL_SIZE_DEFAULT;
-BOOL ESC_TO_EXIT = ESC_TO_EXIT_DEFAULT;
 
 void ShowPixels(HWND hWnd) {
     HDC hdcScreen = GetDC(NULL);
@@ -42,25 +39,28 @@ void ShowPixels(HWND hWnd) {
         exit(1);
     }
 
-    HBRUSH hBr = CreateSolidBrush(RGB(0, 0, 0));
-    int width = rcClient.right - rcClient.left;
-    int height = rcClient.bottom - rcClient.top;
+    if (SHOW_GRID) {
+        HBRUSH hBr = CreateSolidBrush(RGB(0, 0, 0));
+        int width = rcClient.right - rcClient.left;
+        int height = rcClient.bottom - rcClient.top;
 
-    // Vertical lines
-    for (int i = 1; i < PIXEL_COUNT; i++) {
-        int frac = (width * i) / PIXEL_COUNT;
-        RECT lineRect = { frac, 0, frac + 1, height };
-        FillRect(hdcWindow, &lineRect, hBr);
+        // Vertical lines
+        for (int i = 1; i < PIXEL_COUNT; i++) {
+            int frac = (width * i) / PIXEL_COUNT;
+            RECT lineRect = { frac, 0, frac + 1, height };
+            FillRect(hdcWindow, &lineRect, hBr);
+        }
+
+        // Horizontal lines
+        for (int i = 1; i < PIXEL_COUNT; i++) {
+            int frac = (height * i) / PIXEL_COUNT;
+            RECT lineRect = { 0, frac, width, frac + 1 };
+            FillRect(hdcWindow, &lineRect, hBr);
+        }
+
+        DeleteObject(hBr);
     }
 
-    // Horizontal lines
-    for (int i = 1; i < PIXEL_COUNT; i++) {
-        int frac = (height * i) / PIXEL_COUNT;
-        RECT lineRect = { 0, frac, width, frac + 1 };
-        FillRect(hdcWindow, &lineRect, hBr);
-    }
-
-    DeleteObject(hBr);
     ReleaseDC(NULL, hdcScreen);
     ReleaseDC(hWnd, hdcWindow);
 }
@@ -121,10 +121,10 @@ void MoveToCursor(HWND hWnd) {
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
-        case WM_TIMER: {
+        case WM_UPDATE:
+        case WM_TIMER:
             MoveToCursor(hWnd);
             break;
-        }
         case WM_PAINT: {
             PAINTSTRUCT ps;
             BeginPaint(hWnd, &ps);
@@ -162,27 +162,11 @@ void RegisterWindowClass(HINSTANCE hInstance) {
     RegisterClass(&wc);
 }
 
-void LoadData() {
-    DWORD size = sizeof(PIXEL_COUNT);
-	RegGetValue(HKEY_CURRENT_USER, REG_KEY, L"PixelCount", RRF_RT_DWORD, NULL, &PIXEL_COUNT, &size);
-
-    size = sizeof(PIXEL_SIZE);
-    RegGetValue(HKEY_CURRENT_USER, REG_KEY, L"PixelSize", RRF_RT_DWORD, NULL, &PIXEL_SIZE, &size);
-
-    size = sizeof(ESC_TO_EXIT);
-    RegGetValue(HKEY_CURRENT_USER, REG_KEY, L"EscToExit", RRF_RT_DWORD, NULL, &ESC_TO_EXIT, &size);
-}
-
 int APIENTRY wWinMain(
     _In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
     _In_ LPWSTR lpCmdLine, _In_ int nCmdShow
 ) {
-    LoadData();
-
-    ActionThreadData* actData = new ActionThreadData();
-    actData->hInstance = hInstance;
-    actData->pThreadId = GetCurrentThreadId();
-    HANDLE actHandle = CreateThread(NULL, 0, StartActionThread, actData, 0, NULL);
+    LoadConfig();
 
     RegisterWindowClass(hInstance);
     HWND hWnd = CreateWindowEx(
@@ -197,6 +181,12 @@ int APIENTRY wWinMain(
     );
 
     if (!hWnd) return 1;
+
+    ActionThreadData* actData = new ActionThreadData();
+    actData->hInstance = hInstance;
+    actData->pHWnd = hWnd;
+    actData->pThreadId = GetCurrentThreadId();
+    CreateThread(NULL, 0, StartActionThread, actData, 0, NULL);
 
     MoveToCursor(hWnd);
     ShowWindow(hWnd, SW_NORMAL);

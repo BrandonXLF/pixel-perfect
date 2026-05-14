@@ -1,59 +1,55 @@
 #include "windows.h"
 #include "consts.h"
+#include "config.h"
 #include "action.h"
 
-constexpr int WINDOW_WIDTH = 426;
+constexpr int WINDOW_WIDTH = 470;
 constexpr int WINDOW_HEIGHT = 54;
 constexpr WCHAR ACTION_CLASS_NAME[] = L"PixelPerfectActionWindow";
 
 constexpr UINT SIZE_INPUT = 10;
 constexpr UINT ZOOM_INPUT = 20;
 constexpr UINT ESC_CHECKBOX = 30;
+constexpr UINT GRID_CHECKBOX = 50;
 constexpr UINT RESET_BUTTON = 40;
 
 bool noChange = false;
 HFONT hFont;
 HFONT hFontLarge;
+HWND pHWnd;
 
-void ResetAllValues(HWND hWnd) {
+void ResetControls(HWND hWnd) {
 	noChange = true;
-    SetDlgItemInt(hWnd, 10, PIXEL_COUNT, FALSE);
-    SetDlgItemInt(hWnd, 20, PIXEL_SIZE, FALSE);
-    CheckDlgButton(hWnd, 30, ESC_TO_EXIT);
+    SetDlgItemInt(hWnd, SIZE_INPUT, PIXEL_COUNT, FALSE);
+    SetDlgItemInt(hWnd, ZOOM_INPUT, PIXEL_SIZE, FALSE);
+    CheckDlgButton(hWnd, ESC_CHECKBOX, ESC_TO_EXIT);
+    CheckDlgButton(hWnd, GRID_CHECKBOX, SHOW_GRID);
 	noChange = false;
 }
 
 void NumberInputProc(LPCWSTR name, int action, WPARAM wParam, DWORD *value, HWND hWnd) {
     switch (LOWORD(wParam) - action) {
         case 0: {
-            if (noChange || HIWORD(wParam) != EN_CHANGE) return;
+            if (noChange || HIWORD(wParam) != EN_CHANGE) break;
 
             BOOL lpTranslated;
             UINT val = GetDlgItemInt(hWnd, action, &lpTranslated, FALSE);
-                
-            if (lpTranslated) {
-                *value = max(1, val);
-            }
+            if (lpTranslated) SaveValue(name, value, val, pHWnd);
 
             break;
         }
         case 1:
-            *value = max(1, *value - 1);
+            SaveValue(name, value, max(1, *value - 1), pHWnd);
             SetDlgItemInt(hWnd, action, *value, FALSE);
             break;
         case 2:
-            *value = *value + 1;
+            SaveValue(name, value, *value + 1, pHWnd);
             SetDlgItemInt(hWnd, action, *value, FALSE);
             break;
     }
-
-	RegSetKeyValue(HKEY_CURRENT_USER, REG_KEY, name, REG_DWORD, value, sizeof(DWORD));
 }
 
 LRESULT CALLBACK ActionWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-    int a = LOWORD(wParam);
-    int b = HIWORD(wParam);
-
     switch (msg) {
         case WM_COMMAND:
             switch (LOWORD(wParam)) {
@@ -68,16 +64,14 @@ LRESULT CALLBACK ActionWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam
                     NumberInputProc(L"PixelSize", ZOOM_INPUT, wParam, &PIXEL_SIZE, hWnd);
                     break;
                 case ESC_CHECKBOX:
-                    ESC_TO_EXIT = IsDlgButtonChecked(hWnd, ESC_CHECKBOX);
-                    RegSetKeyValue(HKEY_CURRENT_USER, REG_KEY, L"EscToExit", REG_DWORD, &ESC_TO_EXIT, sizeof(DWORD));
+					SaveValue(L"EscToExit", &ESC_TO_EXIT, IsDlgButtonChecked(hWnd, ESC_CHECKBOX), pHWnd);
+                    break;
+                case GRID_CHECKBOX:
+                    SaveValue(L"ShowGrid", &SHOW_GRID, IsDlgButtonChecked(hWnd, GRID_CHECKBOX), pHWnd);
                     break;
                 case RESET_BUTTON:
-                    PIXEL_COUNT = PIXEL_COUNT_DEFAULT;
-                    PIXEL_SIZE = PIXEL_SIZE_DEFAULT;
-                    ESC_TO_EXIT = ESC_TO_EXIT_DEFAULT;
-			        
-                    ResetAllValues(hWnd);
-					RegDeleteTree(HKEY_CURRENT_USER, REG_KEY);
+                    ResetConfig(pHWnd);
+                    ResetControls(hWnd);
                     break;
             }
 
@@ -159,11 +153,12 @@ void ShowActionWindow(HINSTANCE hInstance) {
     );
 
     CreateNumberInput(L"Size:", 10, 30, SIZE_INPUT, hWnd, hInstance);
-    CreateNumberInput(L"Zoom:", 148, 38, ZOOM_INPUT, hWnd, hInstance);
-    CreateWidget(L"BUTTON", BS_CHECKBOX | BS_AUTOCHECKBOX, L"Esc", 295, 5, 45, 25, ESC_CHECKBOX, hWnd, hInstance);
-    CreateWidget(L"BUTTON", BS_PUSHBUTTON, L"Reset", 344, 5, 56, 25, RESET_BUTTON, hWnd, hInstance);
+    CreateNumberInput(L"Zoom:", 146, 38, ZOOM_INPUT, hWnd, hInstance);
+    CreateWidget(L"BUTTON", BS_CHECKBOX | BS_AUTOCHECKBOX, L"Grid", 292, 5, 45, 25, GRID_CHECKBOX, hWnd, hInstance);
+    CreateWidget(L"BUTTON", BS_CHECKBOX | BS_AUTOCHECKBOX, L"Esc", 343, 5, 45, 25, ESC_CHECKBOX, hWnd, hInstance);
+    CreateWidget(L"BUTTON", BS_PUSHBUTTON, L"Reset", 390, 5, 56, 25, RESET_BUTTON, hWnd, hInstance);
 
-	ResetAllValues(hWnd);
+    ResetControls(hWnd);
 }
 
 DWORD WINAPI StartActionThread(LPVOID lpParam) {
@@ -182,6 +177,7 @@ DWORD WINAPI StartActionThread(LPVOID lpParam) {
         L"MS Shell Dlg"
     );
 
+	pHWnd = params->pHWnd;
     RegisterActionWndClass(params->hInstance);
     ShowActionWindow(params->hInstance);
 
