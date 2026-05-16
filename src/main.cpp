@@ -8,21 +8,33 @@
 constexpr int UPDATE_INTERVAL = 40;
 constexpr WCHAR CLASS_NAME[] = L"PixelPerfectWindow";
 
+bool hasError = false;
+
+void ShowError(HWND hWnd, LPCWSTR msg) {
+    hasError = true;
+
+    if (MessageBox(hWnd, msg, L"Error", MB_RETRYCANCEL | MB_ICONERROR) == IDCANCEL) {
+        PostQuitMessage(1);
+	}
+
+    hasError = false;
+}
+
 void ShowPixels(HWND hWnd) {
-    HDC hdcScreen = GetDC(NULL);
-    HDC hdcWindow = GetDC(hWnd);
+	if (hasError) return;
 
     RECT rcClient;
     if (!GetClientRect(hWnd, &rcClient)) {
-        MessageBox(hWnd, L"Failed to get window dimensions", L"Error", MB_OK);
-        exit(1);
+        ShowError(hWnd, L"Failed to get window dimensions");
     }
 
     POINT cursorPos;
     if (!GetCursorPos(&cursorPos)) {
-        MessageBox(hWnd, L"Failed to get cursor position", L"Error", MB_OK);
-        exit(1);
+        ShowError(hWnd, L"Failed to get cursor position");
     }
+
+    HDC hdcScreen = GetDC(NULL);
+    HDC hdcWindow = GetDC(hWnd);
 
     SetStretchBltMode(hdcWindow, COLORONCOLOR);
 
@@ -35,8 +47,7 @@ void ShowPixels(HWND hWnd) {
         PIXEL_COUNT, PIXEL_COUNT,
         SRCCOPY
     )) {
-        MessageBox(hWnd, L"Failed to copy screen", L"Error", MB_OK);
-        exit(1);
+        ShowError(hWnd, L"Failed to copy screen");
     }
 
     if (SHOW_GRID) {
@@ -66,13 +77,14 @@ void ShowPixels(HWND hWnd) {
 }
 
 void MoveToCursor(HWND hWnd) {
+    if (hasError) return;
+
     int windowSize = PIXEL_COUNT * PIXEL_SIZE;
     int cursorGap = ceil((float) PIXEL_COUNT / 2) + 4;
 
     POINT cursorPos;
     if (!GetCursorPos(&cursorPos)) {
-        MessageBox(hWnd, L"Failed to get cursor position", L"Error", MB_OK);
-        exit(1);
+        ShowError(hWnd, L"Failed to get cursor position");
     }
 
     RECT findRect = { cursorPos.x, cursorPos.y, cursorPos.x, cursorPos.y };
