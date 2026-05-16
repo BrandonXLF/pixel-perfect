@@ -128,7 +128,7 @@ void MoveToCursor(HWND hWnd) {
         FALSE
     );
 
-    ShowPixels(hWnd);
+    RedrawWindow(hWnd, NULL, NULL, RDW_INVALIDATE | RDW_FRAME | RDW_UPDATENOW);
 }
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
