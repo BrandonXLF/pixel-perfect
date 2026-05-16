@@ -5,7 +5,7 @@
 #include "config.h"
 #include "action.h"
 
-constexpr int UPDATE_INTERVAL = 100;
+constexpr int UPDATE_INTERVAL = 40;
 constexpr WCHAR CLASS_NAME[] = L"PixelPerfectWindow";
 
 void ShowPixels(HWND hWnd) {
@@ -24,7 +24,7 @@ void ShowPixels(HWND hWnd) {
         exit(1);
     }
 
-    SetStretchBltMode(hdcWindow, HALFTONE);
+    SetStretchBltMode(hdcWindow, COLORONCOLOR);
 
     if (!StretchBlt(
         hdcWindow,
